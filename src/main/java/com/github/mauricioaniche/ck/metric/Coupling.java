@@ -2,8 +2,10 @@ package com.github.mauricioaniche.ck.metric;
 
 import com.github.mauricioaniche.ck.CKClassResult;
 import com.github.mauricioaniche.ck.CKMethodResult;
+import com.github.mauricioaniche.ck.metric.CouplingExtras.CouplingClassification;
 import com.github.mauricioaniche.ck.util.JDTUtils;
 
+import org.apache.log4j.Category;
 import org.eclipse.jdt.core.dom.*;
 
 import java.util.HashSet;
@@ -24,38 +26,51 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 	@Override
 	public void visit(VariableDeclarationStatement node) {
 		if(this.className != null) {
-			coupleTo(node.getType());
+			coupleTo(node.getType(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 		}
 	}
 
 	@Override
-	public void visit(ClassInstanceCreation node) {
+	public void visit(ClassInstanceCreation node) { //Parameter coupling -> constructor call.
+
+        CouplingClassification category = CouplingClassification.ATOMIC_PARAMETER_COUPLING;
 		if(this.className != null) {
-			coupleTo(node.getType());
+
+            List<Expression> args = node.arguments();
+
+            for (Expression argument : args){
+                ITypeBinding binding = argument.resolveTypeBinding();
+                if(binding!= null && !binding.isPrimitive()){
+                    category = CouplingClassification.OBJECT_PARAMETER_COUPLING;
+                }
+            }
+			
+            coupleTo(node.getType(), category);
+
 		} else if(this.methodName != null) {	
 			IMethodBinding binding = node.resolveConstructorBinding();
-			coupleTo(binding);
+			coupleTo(binding, null);
 		} 
 	}
 
 	@Override
 	public void visit(ArrayCreation node) {
 		if(this.className != null) {
-			coupleTo(node.getType());
+			coupleTo(node.getType(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 		}
 	}
 
 	@Override
 	public void visit(FieldDeclaration node) {
 		if(this.className != null) {
-			coupleTo(node.getType());
+			coupleTo(node.getType(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 		}
 	}
 
 	public void visit(ReturnStatement node) {
 		if(this.className != null){
 			if (node.getExpression() != null) {
-				coupleTo(node.getExpression().resolveTypeBinding());
+				coupleTo(node.getExpression().resolveTypeBinding(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 			}
 		}
 	}
@@ -63,14 +78,14 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 	@Override
 	public void visit(TypeLiteral node) {
 		if(this.className != null) {
-			coupleTo(node.getType());
+			coupleTo(node.getType(), null);
 		}
 	}
 	
 	public void visit(ThrowStatement node) {
 		if(this.className != null) {
 			if(node.getExpression()!=null)
-				coupleTo(node.getExpression().resolveTypeBinding());
+				coupleTo(node.getExpression().resolveTypeBinding(), null);
 		}
 	}
 
@@ -81,34 +96,34 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 			if(resolvedType!=null) {
 				ITypeBinding binding = resolvedType.getSuperclass();
 				if (binding != null)
-					coupleTo(binding);
+					coupleTo(binding, CouplingClassification.INHERITANCE_COUPLING);
 	
 				for (ITypeBinding interfaces : resolvedType.getInterfaces()) {
-					coupleTo(interfaces);
+					coupleTo(interfaces, CouplingClassification.INTERFACE_COUPLING);
 				}
 			} else {
-				coupleTo(node.getSuperclassType());
+				coupleTo(node.getSuperclassType(), CouplingClassification.INHERITANCE_COUPLING);
 				List<Type> list = node.superInterfaceTypes();
-				list.forEach(x -> coupleTo(x));
+				list.forEach(x -> coupleTo(x, CouplingClassification.INTERFACE_COUPLING));
 			}
 		}
 
 	}
 
-	public void visit(MethodDeclaration node) {
+	public void visit(MethodDeclaration node) { // Data abstraction coupling: B methodOfA(X x, Y y) {return new B(...)}
 		if(this.className != null) {
 			IMethodBinding resolvedMethod = node.resolveBinding();
 			if (resolvedMethod != null) {
 	
-				coupleTo(resolvedMethod.getReturnType());
+				coupleTo(resolvedMethod.getReturnType(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 	
 				for (ITypeBinding param : resolvedMethod.getParameterTypes()) {
-					coupleTo(param);
+					coupleTo(param, CouplingClassification.DATA_ABSTRACTION_COUPLING);
 				}
 			} else {
-				coupleTo(node.getReturnType2());
+				coupleTo(node.getReturnType2(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 				List<TypeParameter> list = node.typeParameters();
-				list.forEach(x -> coupleTo(x.getName()));
+				list.forEach(x -> coupleTo(x.getName(), CouplingClassification.DATA_ABSTRACTION_COUPLING));
 			}
 		}
 
@@ -117,7 +132,7 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 	@Override
 	public void visit(CastExpression node) {
 		if(this.className != null) {
-			coupleTo(node.getType());
+			coupleTo(node.getType(), null);
 		}
 
 	}
@@ -125,21 +140,33 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 	@Override
 	public void visit(InstanceofExpression node) {
 		if(this.className != null) {
-			coupleTo(node.getRightOperand());
-			coupleTo(node.getLeftOperand().resolveTypeBinding());
+			coupleTo(node.getRightOperand(), null);
+			coupleTo(node.getLeftOperand().resolveTypeBinding(), null);
 		}
 
 	}
 
 	@Override
-	public void visit(MethodInvocation node) {
+	public void visit(MethodInvocation node) { //parameter coupling 
 		
 		IMethodBinding binding = node.resolveMethodBinding();
+        CouplingClassification category = CouplingClassification.ATOMIC_PARAMETER_COUPLING;
 		if(binding!=null) {
 			if(this.className != null) {
-				coupleTo(binding.getDeclaringClass());
+
+                List<Expression> args = node.arguments();
+                
+                for(Expression argument : args){
+                    ITypeBinding argBinding = argument.resolveTypeBinding();
+                    if(argBinding!= null && !argBinding.isPrimitive()){
+                        category = CouplingClassification.OBJECT_PARAMETER_COUPLING;
+                    } 
+                }
+
+				coupleTo(binding.getDeclaringClass(), category);
+
 			} else if(this.methodName != null) {
-				coupleTo(binding);
+				coupleTo(binding, null);
 			}
 		}
 
@@ -147,36 +174,36 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 
 	public void visit(NormalAnnotation node) {
 		if(this.className != null) {
-			coupleTo(node);
+			coupleTo(node, null);
 		}
 	}
 
 	public void visit(MarkerAnnotation node) {
 		if(this.className != null) {
-			coupleTo(node);
+			coupleTo(node, null);
 		}
 	}
 
 	public void visit(SingleMemberAnnotation node) {
 		if(this.className != null) {
-			coupleTo(node);
+			coupleTo(node, null);
 		}
 	}
 
-	public void visit(ParameterizedType node) {
+	public void visit(ParameterizedType node) { // Data abstraction coupling.
 		if(this.className != null) {
 			
 			try {	
 				ITypeBinding binding = node.resolveBinding();
 				if (binding != null) {
 		
-					coupleTo(binding);
+					coupleTo(binding, CouplingClassification.DATA_ABSTRACTION_COUPLING);
 		
 					for (ITypeBinding types : binding.getTypeArguments()) {
-						coupleTo(types);
+						coupleTo(types, CouplingClassification.DATA_ABSTRACTION_COUPLING);
 					}
 				} else {
-					coupleTo(node.getType());
+					coupleTo(node.getType(), CouplingClassification.DATA_ABSTRACTION_COUPLING);
 				}
 			} catch (NullPointerException e) {
 				// TODO: handle exception
@@ -184,71 +211,71 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 		}
 
 	}
-	private void coupleTo(Annotation type) {
+	private void coupleTo(Annotation type, CouplingClassification category) {
 		if(this.className != null) {
 			ITypeBinding resolvedType = type.resolveTypeBinding();
 			if(resolvedType!=null)
-				coupleTo(resolvedType);
+				coupleTo(resolvedType, category);
 			else {
-				addToSet(type.getTypeName().getFullyQualifiedName());
+				addToSet(type.getTypeName().getFullyQualifiedName(), category);
 			}
 		}
 	}
 
-	private void coupleTo(Type type) {
+	private void coupleTo(Type type, CouplingClassification category) {
 		if(type==null)
 			return;
 
 		if(this.className != null) {
 			ITypeBinding resolvedBinding = type.resolveBinding();
 			if(resolvedBinding!=null)
-				coupleTo(resolvedBinding);
+				coupleTo(resolvedBinding, category);
 			else {
 				if(type instanceof SimpleType) {
 					SimpleType castedType = (SimpleType) type;
-					addToSet(castedType.getName().getFullyQualifiedName());
+					addToSet(castedType.getName().getFullyQualifiedName(), category);
 				}
 				else if(type instanceof QualifiedType) {
 					QualifiedType castedType = (QualifiedType) type;
-					addToSet(castedType.getName().getFullyQualifiedName());
+					addToSet(castedType.getName().getFullyQualifiedName(), category);
 				}
 				else if(type instanceof NameQualifiedType) {
 					NameQualifiedType castedType = (NameQualifiedType) type;
-					addToSet(castedType.getName().getFullyQualifiedName());
+					addToSet(castedType.getName().getFullyQualifiedName(), category);
 				}
 				else if(type instanceof ParameterizedType) {
 					ParameterizedType castedType = (ParameterizedType) type;
-					coupleTo(castedType.getType());
+					coupleTo(castedType.getType(), null);
 				}
 				else if(type instanceof WildcardType) {
 					WildcardType castedType = (WildcardType) type;
-					coupleTo(castedType.getBound());
+					coupleTo(castedType.getBound(), null);
 				}
 				else if(type instanceof ArrayType) {
 					ArrayType castedType = (ArrayType) type;
-					coupleTo(castedType.getElementType());
+					coupleTo(castedType.getElementType(), null);
 				}
 				else if(type instanceof IntersectionType) {
 					IntersectionType castedType = (IntersectionType) type;
 					List<Type> types = castedType.types();
-					types.stream().forEach(x -> coupleTo(x));
+					types.stream().forEach(x -> coupleTo(x, null));
 				}
 				else if(type instanceof UnionType) {
 					UnionType castedType = (UnionType) type;
 					List<Type> types = castedType.types();
-					types.stream().forEach(x -> coupleTo(x));
+					types.stream().forEach(x -> coupleTo(x, null));
 				}
 			}
 		}
 	}
 
-	private void coupleTo(SimpleName name) {
+	private void coupleTo(SimpleName name, CouplingClassification category) {
 		if(this.className != null) {
-			addToSet(name.getFullyQualifiedName());
+			addToSet(name.getFullyQualifiedName(), category);
 		}
 	}
 
-	private void coupleTo(ITypeBinding binding) {
+	private void coupleTo(ITypeBinding binding, CouplingClassification category) {
 
 		if(this.className != null) {
 			if (binding == null)
@@ -267,11 +294,12 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 	
 	
 			String cleanedType = cleanClassName(type);
-			addToSet(cleanedType);
+			addToSet(cleanedType, category);
+
 		}
 	}
 	
-	private void coupleTo(IMethodBinding binding) {
+	private void coupleTo(IMethodBinding binding, CouplingClassification category) {
 		
 		if(binding == null)
 			return;
@@ -284,7 +312,7 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 		if (isFromJava(methodNameInvoked))
 			return;
 		
-		addToSet(methodNameInvoked);
+		addToSet(methodNameInvoked, category);
 		
 	}
 
@@ -303,10 +331,11 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 		return type.startsWith("java.") || type.startsWith("javax.");
 	}
 
-	private void addToSet(String name) {
+	private void addToSet(String name, CouplingClassification category) {
 		if(className != null){
 			this.extras.addToSetClassIn(name, this.className);
 			this.extras.addToSetClassOut(this.className, name);
+            if(category != null) this.extras.addCouplingCategoryBetweenClasses(this.className, name, category);
 		} else {
 			this.extras.addToSetMethodIn(name, this.methodName);
 			this.extras.addToSetMethodOut(this.methodName, name);

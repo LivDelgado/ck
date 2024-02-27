@@ -3,9 +3,13 @@ package com.github.mauricioaniche.ck;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
+import com.github.mauricioaniche.ck.metric.CouplingExtras;
+import com.github.mauricioaniche.ck.metric.CouplingExtras.CouplingClassification;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 public class ResultWriter {
 
@@ -259,6 +263,23 @@ public class ResultWriter {
                 }
             }
         }
+    }
+
+    public void printCouplingCategories() throws IOException{
+        FileWriter file = new FileWriter("CouplingClassification.txt");
+        CouplingExtras extras = CouplingExtras.getInstance();
+        Map<String, Map<String, Set<CouplingClassification>>> map = extras.getClassCouplingCategories();
+        
+        for (String key : map.keySet()){
+            for (String clazz : map.get(key).keySet()){
+                file.write(key + " ");
+                file.write(clazz + " " + map.get(key).get(clazz));
+                file.write(System.lineSeparator());
+            }
+        }
+
+        file.flush();
+        file.close();
     }
 
     /**

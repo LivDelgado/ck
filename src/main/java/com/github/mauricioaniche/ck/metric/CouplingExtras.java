@@ -12,15 +12,66 @@ public class CouplingExtras {
 	private Map<String, Set<String>> couplingClassOut;
 	private Map<String, Set<String>> couplingMethodIn;
 	private Map<String, Set<String>> couplingMethodOut;
+    private Map<String, Map<String, Set<CouplingClassification>>> classCouplingCategories;
 	private static CouplingExtras instance;
 	
+    public static enum CouplingClassification {
+        //Parameter coupling
+        ATOMIC_PARAMETER_COUPLING,
+        OBJECT_PARAMETER_COUPLING,
+
+        //Inheritance coupling
+        INHERITANCE_COUPLING,
+        INTERFACE_COUPLING,
+
+        //Global coupling
+        PUBLIC_GLOBAL_COUPLING,
+        STATIC_GLOBAL_COUPLING,
+        PUBLIC_FINAL_GLOBAL_COUPLING,
+        STATIC_FINAL_GLOBAL_COUPLING,
+
+        //Data abstraction coupling
+        DATA_ABSTRACTION_COUPLING;
+    }
+
+
 	private CouplingExtras() {
 		this.couplingClassIn = new HashMap<String, Set<String>>();
 		this.couplingClassOut = new HashMap<String, Set<String>>();
 		this.couplingMethodIn = new HashMap<String, Set<String>>();
 		this.couplingMethodOut = new HashMap<String, Set<String>>();
+        this.classCouplingCategories = new HashMap<String, Map<String, Set<CouplingClassification>>>();
 	}
 	
+    public void addCouplingCategoryBetweenClasses(String key, String clazz, CouplingClassification category){
+
+        if(this.classCouplingCategories.get(key) != null){
+			if(this.classCouplingCategories.get(key).get(clazz) != null) {
+                this.classCouplingCategories.get(key).get(clazz).add(category);
+            }else{
+                this.classCouplingCategories.get(key).put(clazz,  new HashSet<>());
+                this.classCouplingCategories.get(key).get(clazz).add(category);
+            }
+		}else {
+			this.classCouplingCategories.put(key, new HashMap<>());
+			this.classCouplingCategories.get(key).put(clazz, new HashSet<>());
+            this.classCouplingCategories.get(key).get(clazz).add(category);
+		}
+
+        //Symmetric data structure:
+        /* 
+        if(this.classCouplingCategories.get(clazz) != null){
+            if(this.classCouplingCategories.get(clazz).get(key) == null) {
+                this.classCouplingCategories.get(clazz).put(key, this.classCouplingCategories.get(key).get(clazz));
+            }
+        }else{
+            this.classCouplingCategories.put(clazz, new HashMap<>());
+            this.classCouplingCategories.get(clazz).put(key, this.classCouplingCategories.get(key).get(clazz));
+        }
+        */
+
+    }
+
 	public void addToSetClassIn(String key, String clazz){
 		if(this.couplingClassIn.get(key) != null){
 			this.couplingClassIn.get(key).add(clazz);
@@ -117,7 +168,11 @@ public class CouplingExtras {
 		return coupling;
 	}
 	
-	public static CouplingExtras getInstance(){
+	public Map<String, Map<String, Set<CouplingClassification>>> getClassCouplingCategories(){
+        return this.classCouplingCategories;
+    }
+    
+    public static CouplingExtras getInstance(){
 		if(instance == null){
 			instance = new CouplingExtras();
 		}

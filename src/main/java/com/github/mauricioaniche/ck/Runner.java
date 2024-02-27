@@ -69,6 +69,7 @@ public class Runner {
 		}
 		
 		writer.flushAndClose();
+        writer.printCouplingCategories();
 		System.out.println("Metrics extracted!!!");
 	}
 }
