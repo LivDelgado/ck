@@ -10,5 +10,7 @@
 
 ## Executing CKJM
 
+mvn clean compile package
+
 java -jar ./target/ck-0.7.1-SNAPSHOT-jar-with-dependencies.jar ./src true
 
