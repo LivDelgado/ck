@@ -10,28 +10,28 @@ import java.util.TreeSet;
 
 public class LCOM implements CKASTVisitor, ClassLevelMetric {
 
-	ArrayList<TreeSet<String>> methods = new ArrayList<TreeSet<String>>();
+	ArrayList<TreeSet<String>> methods = new ArrayList<>();
 	Set<String> declaredFields;
 	
-	public LCOM() {
-		this.declaredFields = new HashSet<String>();
-	}
+	public LCOM() { this.declaredFields = new HashSet<>(); }
 	
-	public void visit(FieldDeclaration node) {
-		
+	@Override
+	public <T extends ASTNode> void visit(T node) {
+		if (node instanceof FieldDeclaration nodeT) internalVisit(nodeT);
+		else if (node instanceof SimpleName nodeT) internalVisit(nodeT);
+		else if (node instanceof MethodDeclaration nodeT) internalVisit(nodeT);
+	}
+  
+	void internalVisit(FieldDeclaration node) {
 		for(Object o : node.fragments()) {
 			VariableDeclarationFragment vdf = (VariableDeclarationFragment) o;
 			declaredFields.add(vdf.getName().toString());
 		}
-		
 	}
 	
-	public void visit(SimpleName node) {
+	void internalVisit(SimpleName node) {
 		String name = node.getFullyQualifiedName();
-		if(declaredFields.contains(name)) {
-			acessed(name);
-		}
-		
+		if(declaredFields.contains(name)) acessed(name);	
 	}
 
 	private void acessed(String name) {
@@ -40,10 +40,7 @@ public class LCOM implements CKASTVisitor, ClassLevelMetric {
 		}
 	}
 	
-	public void visit(MethodDeclaration node) {
-		methods.add(new TreeSet<String>());
-		
-	}
+	void internalVisit(MethodDeclaration node) { methods.add(new TreeSet<>()); }
 	
 	@Override
 	public void setResult(CKClassResult result) {
@@ -62,7 +59,7 @@ public class LCOM implements CKASTVisitor, ClassLevelMetric {
 		    	
 				TreeSet<?> intersection = (TreeSet<?>)methods.get(i).clone();
 				intersection.retainAll(methods.get(j));
-				if (intersection.size() == 0) lcom++;
+				if (intersection.isEmpty()) lcom++;
 				else lcom--;
 		    }
 		result.setLcom(lcom > 0 ? lcom : 0);

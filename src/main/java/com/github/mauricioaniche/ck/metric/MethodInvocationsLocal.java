@@ -1,9 +1,12 @@
 package com.github.mauricioaniche.ck.metric;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import com.github.mauricioaniche.ck.CKClassResult;
 import com.github.mauricioaniche.ck.CKMethodResult;
-import java.util.*;
-import java.util.stream.Collectors;
 
 //we ignore invocations in the super class, because they are always outside the current class and can never return
 @RunAfter(metrics={RFC.class, MethodLevelFieldUsageCount.class})
@@ -18,7 +21,7 @@ public class MethodInvocationsLocal implements CKASTVisitor, ClassLevelMetric {
         Set<String> nextInvocations = invocations.get(invokedMethod).stream()
                 .filter(invoked -> !exploredKeys.contains(invoked) && !invoked.equals(invokedMethod))
                 .collect(Collectors.toSet());
-        if(nextInvocations.size() > 0){
+        if(!nextInvocations.isEmpty()){
             explored.put(invokedMethod, nextInvocations);
 
             for (String nextInvocation : nextInvocations){
@@ -59,6 +62,7 @@ public class MethodInvocationsLocal implements CKASTVisitor, ClassLevelMetric {
         return methodInvocationsLocal;
     }
 
+    @Override
     public void setResult(CKClassResult result) {
         //extract all direct local invocations for all methods in the current class
         Set<CKMethodResult> methods = result.getMethods();

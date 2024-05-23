@@ -1,17 +1,18 @@
 package com.github.mauricioaniche.ck.metric;
 
-import com.github.mauricioaniche.ck.CKClassResult;
-import org.eclipse.jdt.core.dom.FieldDeclaration;
-import org.eclipse.jdt.core.dom.Modifier;
-
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.Modifier;
+
+import com.github.mauricioaniche.ck.CKClassResult;
 import static com.github.mauricioaniche.ck.util.JDTUtils.getVariableName;
 
 public class NumberOfFields implements CKASTVisitor, ClassLevelMetric {
 
-	private Set<String> fieldNames = new HashSet<>();
+	private final Set<String> fieldNames = new HashSet<>();
 	private int fields;
 	private int staticFields;
 	private int publicFields;
@@ -22,39 +23,40 @@ public class NumberOfFields implements CKASTVisitor, ClassLevelMetric {
 	private int synchronizedFields;
 
 	@Override
-	public void visit(FieldDeclaration node) {
-		fields++;
-		fieldNames.addAll(getVariableName(node.fragments()));
-
-		boolean isPublic = Modifier.isPublic(node.getModifiers());
-		boolean isPrivate = Modifier.isPrivate(node.getModifiers());
-		boolean isProtected = Modifier.isProtected(node.getModifiers());
-
-		if(isPublic)
-			publicFields++;
-		else if(isPrivate)
-			privateFields++;
-		else if(isProtected)
-			protectedFields++;
-		else
-			defaultFields++;
-
-		// other characteristics rather than visibility
-		boolean isStatic = Modifier.isStatic(node.getModifiers());
-		boolean isFinal = Modifier.isFinal(node.getModifiers());
-		boolean isSynchronized = Modifier.isSynchronized(node.getModifiers());
-		
-		if(isStatic)
-			staticFields++;
-
-		if(isFinal)
-			finalFields++;
-
-		if(isSynchronized)
-			synchronizedFields++;
-
+	public <T extends ASTNode> void visit(T node) {
+		if (node instanceof FieldDeclaration nodeT) {
+			fields++;
+			fieldNames.addAll(getVariableName(nodeT.fragments()));
+	
+			boolean isPublic = Modifier.isPublic(nodeT.getModifiers());
+			boolean isPrivate = Modifier.isPrivate(nodeT.getModifiers());
+			boolean isProtected = Modifier.isProtected(nodeT.getModifiers());
+	
+			if(isPublic)
+				publicFields++;
+			else if(isPrivate)
+				privateFields++;
+			else if(isProtected)
+				protectedFields++;
+			else
+				defaultFields++;
+	
+			// other characteristics rather than visibility
+			boolean isStatic = Modifier.isStatic(nodeT.getModifiers());
+			boolean isFinal = Modifier.isFinal(nodeT.getModifiers());
+			boolean isSynchronized = Modifier.isSynchronized(nodeT.getModifiers());
+			
+			if(isStatic)
+				staticFields++;
+	
+			if(isFinal)
+				finalFields++;
+	
+			if(isSynchronized)
+				synchronizedFields++;
+		}
 	}
-
+  
 	@Override
 	public void setResult(CKClassResult result) {
 		result.setNumberOfFields(fields);
