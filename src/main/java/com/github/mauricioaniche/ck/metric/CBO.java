@@ -14,20 +14,10 @@ public class CBO implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
 
   private final Set<String> coupling = new HashSet<>();
 
-  Map<Class<? extends ASTNode>, Boolean> nodeTypeFunctionMapper;
-
-  public CBO() {
-    this.nodeTypeFunctionMapper = new HashMap<>();
-    this.nodeTypeFunctionMapper.put(TypeLiteral.class, true);
-    this.nodeTypeFunctionMapper.put(CastExpression.class, true);
-    this.nodeTypeFunctionMapper.put(NormalAnnotation.class, true);
-    this.nodeTypeFunctionMapper.put(MarkerAnnotation.class, true);
-    this.nodeTypeFunctionMapper.put(SingleMemberAnnotation.class, true);
-  }
-
   @Override
   public <T extends ASTNode> void visit(T node) {
     if (node instanceof ClassInstanceCreation nodeT) nodeCouple(nodeT);
+    else if (node instanceof VariableDeclarationStatement nodeT) nodeCouple(nodeT);
     else if (node instanceof ArrayCreation nodeT) nodeCouple(nodeT);
     else if (node instanceof FieldDeclaration nodeT) nodeCouple(nodeT);
     else if (node instanceof TypeLiteral nodeT) nodeCouple(nodeT);
@@ -41,10 +31,15 @@ public class CBO implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
     else if (node instanceof InstanceofExpression nodeT) internalVisit(nodeT);
     else if (node instanceof MethodInvocation nodeT) internalVisit(nodeT);
     else if (node instanceof ParameterizedType nodeT) internalVisit(nodeT);
+    else if (node instanceof TypeDeclaration nodeT) internalVisit(nodeT);
   }
 
   // region nodeCouple
   private void nodeCouple(ClassInstanceCreation node) {
+    coupleTo(node.getType());
+  }
+
+  private void nodeCouple(VariableDeclarationStatement node) {
     coupleTo(node.getType());
   }
 
@@ -135,6 +130,25 @@ public class CBO implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
       // TODO: handle exception
     }
   }
+
+  private void internalVisit(TypeDeclaration node) {
+		ITypeBinding resolvedType = node.resolveBinding();
+
+		if(resolvedType!=null) {
+			ITypeBinding binding = resolvedType.getSuperclass();
+			if (binding != null)
+				coupleTo(binding);
+
+			for (ITypeBinding interfaces : resolvedType.getInterfaces()) {
+				coupleTo(interfaces);
+			}
+		} else {
+			coupleTo(node.getSuperclassType());
+			List<Type> list = node.superInterfaceTypes();
+			list.forEach(x -> coupleTo(x));
+		}
+
+	}
 
   // endregion
 
