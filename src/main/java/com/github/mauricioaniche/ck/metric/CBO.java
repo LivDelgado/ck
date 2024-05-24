@@ -2,54 +2,136 @@ package com.github.mauricioaniche.ck.metric;
 
 import com.github.mauricioaniche.ck.CKClassResult;
 import com.github.mauricioaniche.ck.CKMethodResult;
-import org.eclipse.jdt.core.dom.*;
-
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.eclipse.jdt.core.dom.*;
 
 public class CBO implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
 
-	private Set<String> coupling = new HashSet<String>();
+  private final Set<String> coupling = new HashSet<>();
 
-	@Override
-	public void visit(VariableDeclarationStatement node) {
-		coupleTo(node.getType());
-	}
+  @Override
+  public <T extends ASTNode> void visit(T node) {
+    if (node instanceof ClassInstanceCreation nodeT) nodeCouple(nodeT);
+    else if (node instanceof VariableDeclarationStatement nodeT) nodeCouple(nodeT);
+    else if (node instanceof ArrayCreation nodeT) nodeCouple(nodeT);
+    else if (node instanceof FieldDeclaration nodeT) nodeCouple(nodeT);
+    else if (node instanceof TypeLiteral nodeT) nodeCouple(nodeT);
+    else if (node instanceof CastExpression nodeT) nodeCouple(nodeT);
+    else if (node instanceof NormalAnnotation nodeT) nodeCouple(nodeT);
+    else if (node instanceof MarkerAnnotation nodeT) nodeCouple(nodeT);
+    else if (node instanceof SingleMemberAnnotation nodeT) nodeCouple(nodeT);
+    else if (node instanceof ReturnStatement nodeT) internalVisit(nodeT);
+    else if (node instanceof ThrowStatement nodeT) internalVisit(nodeT);
+    else if (node instanceof MethodDeclaration nodeT) internalVisit(nodeT);
+    else if (node instanceof InstanceofExpression nodeT) internalVisit(nodeT);
+    else if (node instanceof MethodInvocation nodeT) internalVisit(nodeT);
+    else if (node instanceof ParameterizedType nodeT) internalVisit(nodeT);
+    else if (node instanceof TypeDeclaration nodeT) internalVisit(nodeT);
+  }
 
-	@Override
-	public void visit(ClassInstanceCreation node) {
-		coupleTo(node.getType());
-	}
+  // region nodeCouple
+  private void nodeCouple(ClassInstanceCreation node) {
+    coupleTo(node.getType());
+  }
 
-	@Override
-	public void visit(ArrayCreation node) {
-		coupleTo(node.getType());
-	}
+  private void nodeCouple(VariableDeclarationStatement node) {
+    coupleTo(node.getType());
+  }
 
-	@Override
-	public void visit(FieldDeclaration node) {
-		coupleTo(node.getType());
-	}
+  private void nodeCouple(ArrayCreation node) {
+    coupleTo(node.getType());
+  }
 
-	public void visit(ReturnStatement node) {
-		if (node.getExpression() != null) {
-			coupleTo(node.getExpression().resolveTypeBinding());
-		}
-	}
+  private void nodeCouple(FieldDeclaration node) {
+    coupleTo(node.getType());
+  }
 
-	@Override
-	public void visit(TypeLiteral node) {
-		coupleTo(node.getType());
-	}
-	
-	public void visit(ThrowStatement node) {
-		if(node.getExpression()!=null)
-			coupleTo(node.getExpression().resolveTypeBinding());
-	}
+  private void nodeCouple(TypeLiteral node) {
+    coupleTo(node.getType());
+  }
 
-	public void visit(TypeDeclaration node) {
+  private void nodeCouple(CastExpression node) {
+    coupleTo(node.getType());
+  }
+
+  private void nodeCouple(NormalAnnotation node) {
+    coupleTo(node);
+  }
+
+  private void nodeCouple(MarkerAnnotation node) {
+    coupleTo(node);
+  }
+
+  private void nodeCouple(SingleMemberAnnotation node) {
+    coupleTo(node);
+  }
+
+  // endregion
+
+  // region internalVisit
+  private void internalVisit(ReturnStatement node) {
+    if (node.getExpression() != null) {
+      coupleTo(node.getExpression().resolveTypeBinding());
+    }
+  }
+
+  private void internalVisit(ThrowStatement node) {
+    if (node.getExpression() != null) coupleTo(node.getExpression().resolveTypeBinding());
+  }
+
+  private void internalVisit(MethodDeclaration node) {
+
+    IMethodBinding resolvedMethod = node.resolveBinding();
+    if (resolvedMethod != null) {
+
+      coupleTo(resolvedMethod.getReturnType());
+
+      for (ITypeBinding param : resolvedMethod.getParameterTypes()) {
+        coupleTo(param);
+      }
+    } else {
+      coupleTo(node.getReturnType2());
+      List<TypeParameter> list = node.typeParameters();
+      list.forEach(x -> coupleTo(x.getName()));
+    }
+  }
+
+  private void internalVisit(InstanceofExpression node) {
+
+    coupleTo(node.getRightOperand());
+    coupleTo(node.getLeftOperand().resolveTypeBinding());
+  }
+
+  private void internalVisit(MethodInvocation node) {
+
+    IMethodBinding binding = node.resolveMethodBinding();
+    if (binding != null) coupleTo(binding.getDeclaringClass());
+  }
+
+  private void internalVisit(ParameterizedType node) {
+    try {
+      ITypeBinding binding = node.resolveBinding();
+      if (binding != null) {
+
+        coupleTo(binding);
+
+        for (ITypeBinding types : binding.getTypeArguments()) {
+          coupleTo(types);
+        }
+      } else {
+        coupleTo(node.getType());
+      }
+    } catch (NullPointerException e) {
+      // TODO: handle exception
+    }
+  }
+
+  private void internalVisit(TypeDeclaration node) {
 		ITypeBinding resolvedType = node.resolveBinding();
 
 		if(resolvedType!=null) {
@@ -68,204 +150,111 @@ public class CBO implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
 
 	}
 
-	public void visit(MethodDeclaration node) {
+  // endregion
 
-		IMethodBinding resolvedMethod = node.resolveBinding();
-		if (resolvedMethod != null) {
+  private void coupleTo(Annotation type) {
+    ITypeBinding resolvedType = type.resolveTypeBinding();
+    if (resolvedType != null) coupleTo(resolvedType);
+    else {
+      addToSet(type.getTypeName().getFullyQualifiedName());
+    }
+  }
 
-			coupleTo(resolvedMethod.getReturnType());
+  private void coupleTo(Type type) {
+    if (type == null) return;
 
-			for (ITypeBinding param : resolvedMethod.getParameterTypes()) {
-				coupleTo(param);
-			}
-		} else {
-			coupleTo(node.getReturnType2());
-			List<TypeParameter> list = node.typeParameters();
-			list.forEach(x -> coupleTo(x.getName()));
-		}
+    ITypeBinding resolvedBinding = type.resolveBinding();
+    if (resolvedBinding != null) coupleTo(resolvedBinding);
+    else {
+      if (type instanceof SimpleType castedType) {
+        addToSet(castedType.getName().getFullyQualifiedName());
+      } else if (type instanceof QualifiedType castedType) {
+        addToSet(castedType.getName().getFullyQualifiedName());
+      } else if (type instanceof NameQualifiedType castedType) {
+        addToSet(castedType.getName().getFullyQualifiedName());
+      } else if (type instanceof ParameterizedType) {
+        ParameterizedType castedType = (ParameterizedType) type;
+        coupleTo(castedType.getType());
+      } else if (type instanceof WildcardType castedType) {
+        coupleTo(castedType.getBound());
+      } else if (type instanceof ArrayType castedType) {
+        coupleTo(castedType.getElementType());
+      } else if (type instanceof IntersectionType castedType) {
+        List<Type> types = castedType.types();
+        types.stream().forEach(x -> coupleTo(x));
+      } else if (type instanceof UnionType castedType) {
+        List<Type> types = castedType.types();
+        types.stream().forEach(x -> coupleTo(x));
+      }
+    }
+  }
 
-	}
+  private void coupleTo(SimpleName name) {
+    addToSet(name.getFullyQualifiedName());
+  }
 
-	@Override
-	public void visit(CastExpression node) {
-		coupleTo(node.getType());
+  private void coupleTo(ITypeBinding binding) {
 
-	}
+    if (binding == null) return;
+    if (binding.isWildcardType()) return;
+    if (binding.isNullType()) return;
 
-	@Override
-	public void visit(InstanceofExpression node) {
+    String type = binding.getQualifiedName();
+    if (type.equals("null")) return;
 
-		coupleTo(node.getRightOperand());
-		coupleTo(node.getLeftOperand().resolveTypeBinding());
+    if (isFromJava(type) || binding.isPrimitive()) return;
 
-	}
+    String cleanedType = cleanClassName(type);
+    addToSet(cleanedType);
+  }
 
-	@Override
-	public void visit(MethodInvocation node) {
+  private String cleanClassName(String type) {
+    // remove possible array(s) in the class name
+    String cleanedType = type.replace("[]", "").replace("\\$", ".");
 
-		IMethodBinding binding = node.resolveMethodBinding();
-		if(binding!=null)
-			coupleTo(binding.getDeclaringClass());
+    // remove generics declaration, let's stype with the type
+    if (cleanedType.contains("<")) cleanedType = cleanedType.substring(0, cleanedType.indexOf("<"));
 
-	}
+    return cleanedType;
+  }
 
-	public void visit(NormalAnnotation node) {
-		coupleTo(node);
-	}
+  private boolean isFromJava(String type) {
+    return type.startsWith("java.") || type.startsWith("javax.");
+  }
 
-	public void visit(MarkerAnnotation node) {
-		coupleTo(node);
-	}
+  private void addToSet(String name) {
+    this.coupling.add(name);
+  }
 
-	public void visit(SingleMemberAnnotation node) {
-		coupleTo(node);
-	}
+  @Override
+  public void setResult(CKClassResult result) {
+    clean();
+    result.setCbo(getValue());
+  }
 
-	public void visit(ParameterizedType node) {
-		try {
-			ITypeBinding binding = node.resolveBinding();
-			if (binding != null) {
-	
-				coupleTo(binding);
-	
-				for (ITypeBinding types : binding.getTypeArguments()) {
-					coupleTo(types);
-				}
-			} else {
-				coupleTo(node.getType());
-			}
-		} catch (NullPointerException e) {
-			// TODO: handle exception
-		}
+  // given that some resolvings might fail, we remove types that might
+  // had appeared here twice.
+  // e.g. if the set contains 'A.B.Class' and 'Class', it is likely that
+  // 'Class' == 'A.B.Class'
+  private void clean() {
+    Set<String> singleQualifiedTypes =
+        coupling.stream().filter(x -> !x.contains(".")).collect(Collectors.toSet());
 
-	}
-	private void coupleTo(Annotation type) {
-		ITypeBinding resolvedType = type.resolveTypeBinding();
-		if(resolvedType!=null)
-			coupleTo(resolvedType);
-		else {
-			addToSet(type.getTypeName().getFullyQualifiedName());
-		}
-	}
+    for (String singleQualifiedType : singleQualifiedTypes) {
+      long count = coupling.stream().filter(x -> x.endsWith("." + singleQualifiedType)).count();
 
-	private void coupleTo(Type type) {
-		if(type==null)
-			return;
+      boolean theSameFullyQualifiedTypeExists = count > 0;
+      if (theSameFullyQualifiedTypeExists) coupling.remove(singleQualifiedType);
+    }
+  }
 
-		ITypeBinding resolvedBinding = type.resolveBinding();
-		if(resolvedBinding!=null)
-			coupleTo(resolvedBinding);
-		else {
-			if(type instanceof SimpleType) {
-				SimpleType castedType = (SimpleType) type;
-				addToSet(castedType.getName().getFullyQualifiedName());
-			}
-			else if(type instanceof QualifiedType) {
-				QualifiedType castedType = (QualifiedType) type;
-				addToSet(castedType.getName().getFullyQualifiedName());
-			}
-			else if(type instanceof NameQualifiedType) {
-				NameQualifiedType castedType = (NameQualifiedType) type;
-				addToSet(castedType.getName().getFullyQualifiedName());
-			}
-			else if(type instanceof ParameterizedType) {
-				ParameterizedType castedType = (ParameterizedType) type;
-				coupleTo(castedType.getType());
-			}
-			else if(type instanceof WildcardType) {
-				WildcardType castedType = (WildcardType) type;
-				coupleTo(castedType.getBound());
-			}
-			else if(type instanceof ArrayType) {
-				ArrayType castedType = (ArrayType) type;
-				coupleTo(castedType.getElementType());
-			}
-			else if(type instanceof IntersectionType) {
-				IntersectionType castedType = (IntersectionType) type;
-				List<Type> types = castedType.types();
-				types.stream().forEach(x -> coupleTo(x));
-			}
-			else if(type instanceof UnionType) {
-				UnionType castedType = (UnionType) type;
-				List<Type> types = castedType.types();
-				types.stream().forEach(x -> coupleTo(x));
-			}
-		}
-	}
+  @Override
+  public void setResult(CKMethodResult result) {
+    clean();
+    result.setCbo(getValue());
+  }
 
-	private void coupleTo(SimpleName name) {
-		addToSet(name.getFullyQualifiedName());
-	}
-
-	private void coupleTo(ITypeBinding binding) {
-
-		if (binding == null)
-			return;
-		if (binding.isWildcardType())
-			return;
-		if (binding.isNullType())
-			return;
-
-		String type = binding.getQualifiedName();
-		if (type.equals("null"))
-			return;
-
-		if (isFromJava(type) || binding.isPrimitive())
-			return;
-
-
-		String cleanedType = cleanClassName(type);
-		addToSet(cleanedType);
-	}
-
-	private String cleanClassName(String type) {
-		// remove possible array(s) in the class name
-		String cleanedType = type.replace("[]", "").replace("\\$", ".");
-
-		// remove generics declaration, let's stype with the type
-		if(cleanedType.contains("<"))
-			cleanedType = cleanedType.substring(0, cleanedType.indexOf("<"));
-
-		return cleanedType;
-	}
-
-	private boolean isFromJava(String type) {
-		return type.startsWith("java.") || type.startsWith("javax.");
-	}
-
-	private void addToSet(String name) {
-		this.coupling.add(name);
-	}
-
-	@Override
-	public void setResult(CKClassResult result) {
-		clean();
-		result.setCbo(getValue());
-	}
-
-	// given that some resolvings might fail, we remove types that might
-	// had appeared here twice.
-	// e.g. if the set contains 'A.B.Class' and 'Class', it is likely that
-	// 'Class' == 'A.B.Class'
-	private void clean() {
-		Set<String> singleQualifiedTypes = coupling.stream().filter(x -> !x.contains(".")).collect(Collectors.toSet());
-
-		for(String singleQualifiedType : singleQualifiedTypes) {
-			long count = coupling.stream().filter(x -> x.endsWith("." + singleQualifiedType)).count();
-
-			boolean theSameFullyQualifiedTypeExists = count > 0;
-			if(theSameFullyQualifiedTypeExists)
-				coupling.remove(singleQualifiedType);
-		}
-	}
-
-	@Override
-	public void setResult(CKMethodResult result) {
-		clean();
-		result.setCbo(getValue());
-	}
-
-	private int getValue() {
-		return coupling.size();
-	}
+  private int getValue() {
+    return coupling.size();
+  }
 }

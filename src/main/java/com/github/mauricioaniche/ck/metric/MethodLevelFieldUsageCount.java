@@ -1,78 +1,86 @@
 package com.github.mauricioaniche.ck.metric;
 
-import com.github.mauricioaniche.ck.CKMethodResult;
-import org.eclipse.jdt.core.dom.*;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class MethodLevelFieldUsageCount implements CKASTVisitor, MethodLevelMetric, VariableOrFieldMetric {
-	private Set<String> declaredFields;
-	private Map<String, Integer> occurrences;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.IVariableBinding;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.QualifiedName;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 
-	private Set<String> variables;
-	private boolean isFieldAccess;
-	private boolean isQualifiedName;
+import com.github.mauricioaniche.ck.CKMethodResult;
 
-	public MethodLevelFieldUsageCount() {
-		declaredFields = new HashSet<>();
-		this.occurrences = new HashMap<>();
-		this.variables = new HashSet<>();
-	}
+public class MethodLevelFieldUsageCount
+    implements CKASTVisitor, MethodLevelMetric, VariableOrFieldMetric {
+  private final Set<String> declaredFields;
+  private final Map<String, Integer> occurrences;
 
-	public void visit(MethodDeclaration node) {
-		IMethodBinding binding = node.resolveBinding();
-		if(binding==null)
-			return;
+  private final Set<String> variables;
+  private boolean isFieldAccess;
+  private boolean isQualifiedName;
 
-		IVariableBinding[] fields = binding.getDeclaringClass().getDeclaredFields();
+  public MethodLevelFieldUsageCount() {
+    declaredFields = new HashSet<>();
+    this.occurrences = new HashMap<>();
+    this.variables = new HashSet<>();
+  }
 
-		for (IVariableBinding field : fields) {
-			declaredFields.add(field.getName());
-		}
-	}
+  @Override
+  public <T extends ASTNode> void visit(T node) {
+    if (node instanceof MethodDeclaration nodeT) internalVisit(nodeT);
+    else if (node instanceof VariableDeclarationFragment nodeT) internalVisit(nodeT);
+    else if (node instanceof SimpleName nodeT) internalVisit(nodeT);
+    else if (node instanceof FieldAccess) isFieldAccess = true;
+    else if (node instanceof QualifiedName) isQualifiedName = true;
+  }
 
-	public void visit(VariableDeclarationFragment node) {
-		String var = node.getName().toString();
-		variables.add(var);
-	}
+  @Override
+  public <T extends ASTNode> void endVisit(T node) {
+    if (node instanceof FieldAccess) isFieldAccess = false;
+    else if (node instanceof QualifiedName) isQualifiedName = false;
+  }
 
-	public void visit(FieldAccess node) {
-		isFieldAccess = true;
-	}
+  void internalVisit(MethodDeclaration node) {
+    IMethodBinding binding = node.resolveBinding();
+    if (binding == null) return;
 
-	public void endVisit(FieldAccess node) {
-		isFieldAccess = false;
-	}
+    IVariableBinding[] fields = binding.getDeclaringClass().getDeclaredFields();
 
-	public void visit(QualifiedName node){
-		isQualifiedName = true;
-	}
+    for (IVariableBinding field : fields) {
+      declaredFields.add(field.getName());
+    }
+  }
 
-	public void endVisit(QualifiedName node) {
-		isQualifiedName = false;
-	}
+  void internalVisit(VariableDeclarationFragment node) {
+    variables.add(node.getName().toString());
+  }
 
-	private void plusOne(String var) {
-		if (!occurrences.containsKey(var))
-			occurrences.put(var, 0);
-		occurrences.put(var, occurrences.get(var) + 1);
-	}
+  private void plusOne(String var) {
+    if (!occurrences.containsKey(var)) occurrences.put(var, 0);
+    occurrences.put(var, occurrences.get(var) + 1);
+  }
 
-	public void visit(SimpleName node) {
-		String variableName = node.getIdentifier();
+  void internalVisit(SimpleName node) {
+    String variableName = node.getIdentifier();
 
-		boolean accessFieldUsingThis = isFieldAccess && declaredFields.contains(variableName);
-		boolean accessFieldUsingOnlyVariableName = !isFieldAccess && declaredFields.contains(variableName) && !variables.contains(variableName);
-		if((accessFieldUsingThis || accessFieldUsingOnlyVariableName) && !isQualifiedName) {
-			plusOne(variableName);
-		}
-	}
+    boolean accessFieldUsingThis = isFieldAccess && declaredFields.contains(variableName);
+    boolean accessFieldUsingOnlyVariableName =
+        !isFieldAccess
+            && declaredFields.contains(variableName)
+            && !variables.contains(variableName);
+    if ((accessFieldUsingThis || accessFieldUsingOnlyVariableName) && !isQualifiedName) {
+      plusOne(variableName);
+    }
+  }
 
-	@Override
-	public void setResult(CKMethodResult result) {
-		result.setFieldUsage(occurrences);
-	}
+  @Override
+  public void setResult(CKMethodResult result) {
+    result.setFieldUsage(occurrences);
+  }
 }

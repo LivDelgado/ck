@@ -1,59 +1,69 @@
 package com.github.mauricioaniche.ck.metric;
 
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.AnonymousClassDeclaration;
+import org.eclipse.jdt.core.dom.EnumDeclaration;
+import org.eclipse.jdt.core.dom.LambdaExpression;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+
 import com.github.mauricioaniche.ck.CKClassResult;
 import com.github.mauricioaniche.ck.CKMethodResult;
-import org.eclipse.jdt.core.dom.*;
 
-public class NumberOfInnerClassesLambdasAndAnonymousClasses implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
+public class NumberOfInnerClassesLambdasAndAnonymousClasses
+    implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
 
-	private int anonymousClassesQty = 0;
-	private int innerClassesQty = 0;
-	private int lambdasQty = 0;
+  private int anonymousClassesQty = 0;
+  private int innerClassesQty = 0;
+  private int lambdasQty = 0;
 
-	private String firstFound = null;
+  private String firstFound = null;
 
-	public void visit(TypeDeclaration node) {
+  @Override
+  public <T extends ASTNode> void visit(T node) {
+    if (node instanceof TypeDeclaration nodeT) internalVisit(nodeT);
+    else if (node instanceof EnumDeclaration nodeT) internalVisit(nodeT);
+    else if (node instanceof LambdaExpression nodeT) internalVisit(nodeT);
+    else if (node instanceof AnonymousClassDeclaration nodeT) internalVisit(nodeT);
+  }
 
-		if(firstFound == null)
-			firstFound = "type";
+  void internalVisit(TypeDeclaration node) {
+    if (firstFound == null) firstFound = "type";
 
-		innerClassesQty++;
-	}
+    innerClassesQty++;
+  }
 
-	public void visit(EnumDeclaration node) {
-		// we count enum as class declaration!
-		innerClassesQty++;
+  void internalVisit(EnumDeclaration node) {
+    // we count enum as class declaration!
+    innerClassesQty++;
 
-		if(firstFound == null)
-			firstFound = "enum";
-	}
+    if (firstFound == null) firstFound = "enum";
+  }
 
-	public void visit(LambdaExpression node) {
-		lambdasQty++;
+  void internalVisit(LambdaExpression node) {
+    lambdasQty++;
 
-		if(firstFound == null)
-			firstFound = "lambda";
-	}
+    if (firstFound == null) firstFound = "lambda";
+  }
 
-	public void visit(AnonymousClassDeclaration node) {
-		anonymousClassesQty++;
+  void internalVisit(AnonymousClassDeclaration node) {
+    anonymousClassesQty++;
 
-		if(firstFound == null)
-			firstFound = "anonymous";
-	}
+    if (firstFound == null) firstFound = "anonymous";
+  }
 
-	@Override
-	public void setResult(CKClassResult result) {
-		// the -1 there is because the main type under analysis here is counted as +1.
-		result.setAnonymousClassesQty(anonymousClassesQty - (firstFound.equals("anonymous")?1:0));
-		result.setInnerClassesQty(innerClassesQty - (firstFound.equals("type") || firstFound.equals("enum")?1:0));
-		result.setLambdasQty(lambdasQty - (firstFound.equals("lambda")?1:0));
-	}
+  @Override
+  public void setResult(CKClassResult result) {
+    // the -1 there is because the main type under analysis here is counted as +1.
+    result.setAnonymousClassesQty(anonymousClassesQty - (firstFound.equals("anonymous") ? 1 : 0));
+    result.setInnerClassesQty(
+        innerClassesQty - (firstFound.equals("type") || firstFound.equals("enum") ? 1 : 0));
+    result.setLambdasQty(lambdasQty - (firstFound.equals("lambda") ? 1 : 0));
+  }
 
-	@Override
-	public void setResult(CKMethodResult result) {
-		result.setAnonymousClassesQty(anonymousClassesQty);
-		result.setInnerClassesQty(innerClassesQty);
-		result.setLambdasQty(lambdasQty);
-	}
+  @Override
+  public void setResult(CKMethodResult result) {
+    result.setAnonymousClassesQty(anonymousClassesQty);
+    result.setInnerClassesQty(innerClassesQty);
+    result.setLambdasQty(lambdasQty);
+  }
 }
