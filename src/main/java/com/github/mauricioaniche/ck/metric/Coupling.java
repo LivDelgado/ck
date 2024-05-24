@@ -245,7 +245,7 @@ public class Coupling implements CKASTVisitor, ClassLevelMetric, MethodLevelMetr
 
     if (binding == null) return;
 
-    String methodNameInvoked = JDTUtils.getQualifiedMethodFullName(binding);
+    String methodNameInvoked = JDTUtils.getInstance().getQualifiedMethodFullName(binding);
 
     if (methodNameInvoked.equals("null")) return;
 

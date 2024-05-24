@@ -55,7 +55,7 @@ public class LCOMNormalized implements CKASTVisitor, ClassLevelMetric {
 
   void internalVisit(MethodDeclaration node) {
 
-    String currentMethodName = JDTUtils.getMethodFullName(node);
+    String currentMethodName = JDTUtils.getInstance().getMethodFullName(node);
 
     if (!this.methods.isEmpty()) {
       if (this.methods.get(this.methods.size() - 1).equals(currentMethodName)) {
