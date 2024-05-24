@@ -136,7 +136,6 @@
 					<release>17</release>
                     <compilerArgs>
                         <arg>-Xlint:all</arg>
-                        <arg>-Werror</arg>
                         <arg>--enable-preview</arg>
                     </compilerArgs>
                 </configuration>

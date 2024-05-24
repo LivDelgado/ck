@@ -112,15 +112,15 @@ public class CKVisitor extends ASTVisitor {
   public boolean visit(MethodDeclaration node) {
 
     node.resolveBinding();
-    String currentMethodName = JDTUtils.getMethodFullName(node);
-    String currentQualifiedMethodName = JDTUtils.getQualifiedMethodFullName(node);
+    String currentMethodName = JDTUtils.getInstance().getMethodFullName(node);
+    String currentQualifiedMethodName = JDTUtils.getInstance().getQualifiedMethodFullName(node);
     boolean isConstructor = node.isConstructor();
 
     CKMethodResult currentMethod =
         new CKMethodResult(
             currentMethodName, currentQualifiedMethodName, isConstructor, node.getModifiers());
     currentMethod.setLoc(calculate(node.toString()));
-    currentMethod.setStartLine(JDTUtils.getStartLine(cu, node));
+    currentMethod.setStartLine(JDTUtils.getInstance().getStartLine(cu, node));
 
     // we add it to the current class we are visiting
     MethodInTheStack methodInTheStack =
@@ -196,7 +196,7 @@ public class CKVisitor extends ASTVisitor {
     CKMethodResult currentMethod =
         new CKMethodResult(currentMethodName, currentMethodName, false, node.getModifiers());
     currentMethod.setLoc(calculate(node.toString()));
-    currentMethod.setStartLine(JDTUtils.getStartLine(cu, node));
+    currentMethod.setStartLine(JDTUtils.getInstance().getStartLine(cu, node));
 
     // we add it to the current class we are visiting
     MethodInTheStack methodInTheStack =

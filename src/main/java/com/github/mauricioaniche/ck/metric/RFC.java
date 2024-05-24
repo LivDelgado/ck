@@ -16,12 +16,12 @@ public class RFC implements CKASTVisitor, ClassLevelMetric, MethodLevelMetric {
   }
 
   private void internalVisit(MethodInvocation node) {
-    String methodName = JDTUtils.getQualifiedMethodFullName(node);
+    String methodName = JDTUtils.getInstance().getQualifiedMethodFullName(node);
     methodInvocations.add(methodName);
   }
 
   private void internalVisit(SuperMethodInvocation node) {
-    String methodName = JDTUtils.getQualifiedMethodFullName(node);
+    String methodName = JDTUtils.getInstance().getQualifiedMethodFullName(node);
     methodInvocations.add(methodName);
   }
 

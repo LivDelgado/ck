@@ -8,7 +8,7 @@ import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.Modifier;
 
 import com.github.mauricioaniche.ck.CKClassResult;
-import static com.github.mauricioaniche.ck.util.JDTUtils.getVariableName;
+import com.github.mauricioaniche.ck.util.JDTUtils;
 
 public class NumberOfFields implements CKASTVisitor, ClassLevelMetric {
 
@@ -26,7 +26,7 @@ public class NumberOfFields implements CKASTVisitor, ClassLevelMetric {
 	public <T extends ASTNode> void visit(T node) {
 		if (node instanceof FieldDeclaration nodeT) {
 			fields++;
-			fieldNames.addAll(getVariableName(nodeT.fragments()));
+			fieldNames.addAll(JDTUtils.getInstance().getVariableName(nodeT.fragments()));
 	
 			boolean isPublic = Modifier.isPublic(nodeT.getModifiers());
 			boolean isPrivate = Modifier.isPrivate(nodeT.getModifiers());
